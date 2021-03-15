@@ -1,0 +1,17 @@
+using System;
+using CommonTypes;
+            namespace RoslynCompileSample
+            {
+                public class Writer
+                {
+                    public Person TestProc1
+                     (string firstName, string lastName, string age) {
+                        Console.WriteLine("Hello world !");
+                        return new Person {
+                               FirstName = firstName,
+                               LastName = lastName,
+                               Age = age
+                            };
+                    }
+                }
+            }
