@@ -1,5 +1,4 @@
 ﻿using Google.Protobuf;
-using Google.Protobuf.Findscu.FindscuStudy;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using ProtoBuf;
 using System;
