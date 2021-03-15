@@ -1,15 +1,11 @@
-﻿using Google.Protobuf;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
+﻿
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
-using System.Data.OleDb;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Numerics;
 using System.Text;
-using System.Threading.Tasks;
 using System.Xml;
 using TRICS.General.Log;
 using TRICS.Planner.Model.Common.Dicom;
@@ -42,7 +38,6 @@ namespace FindscuStudy {
         private static KeyValDBClient dbClient4 = new KeyValDBClient();
         private static KeyValDBClient dbClient2 = new KeyValDBClient();
         private static KeyValDBClient dbClient3 = new KeyValDBClient();
-        //private static DbProtoManager dbManager = new DbProtoManager<T>();
 
         private string QRServerHost = "www.dicomserver.co.uk";
         private int QRServerPort = 104;
@@ -138,17 +133,13 @@ namespace FindscuStudy {
             p.StartInfo.RedirectStandardOutput = true;
             p.StartInfo.FileName = com;
             p.StartInfo.Arguments = fileToConvert;
-            //"C:\\work\\Alcon\\output\\637370491818394707\\OD\\Measurements_OAM_1.2.840.114537.2.42.1.19050006.3.637370491833586426.dcm";
             p.Start();
             // Do not wait for the child process to exit before
             // reading to the end of its redirected stream.
             // p.WaitForExit();
             // Read the output stream first and then wait.
-            string output = p.StandardOutput.ReadToEnd();
+            p.StandardOutput.ReadToEnd();
             p.WaitForExit();
-
-            //XmlDocument doc = new XmlDocument();
-            //doc.LoadXml(output);
 
             return null;
         }
@@ -319,22 +310,14 @@ namespace FindscuStudy {
             for (int i = 0; i < patients.Count; i++) {
 
                 DicomPatientData p = persons[i];
-                //string key = patients[i].GetFallbackKey().ToUpper();
-                /*
-                string key = 
-                    (!String.IsNullOrWhiteSpace(p.Identity.PatientFirstName) ? p.Identity.PatientFirstName.ToUpper() : "") + "_" + 
-                    (!String.IsNullOrWhiteSpace(p.Identity.PatientLastName) ? p.Identity.PatientLastName.ToUpper() : "") + "_" + 
-                    (!String.IsNullOrEmpty(p.Identity.PatientBirthDate) ? p.Identity.PatientBirthDate.ToUpper() : "") + "_" + 
-                    (!String.IsNullOrWhiteSpace(p.Identity.PatientID) ? p.Identity.PatientID.ToUpper() : "") + "_";
-                */            
-                //p.PatientKey = key;
                 Put(p);
                 Put(patients[i]);
             }
+            /*
             foreach (DicomPatientData p in persons) {
-                //string key = p.FirstName + "_" + p.LastName + "_" + p.Birthday + "_" + p.Id + "_";
                 DicomPatientData person = Get(p.PatientKey);
             }
+            */
         }
         
         private string GetConvertedString(string value) {
