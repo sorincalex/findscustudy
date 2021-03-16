@@ -42,6 +42,10 @@ namespace FindscuStudy {
         private static int TIMEOUT = 60;
         private static string CALLING_DEFAULT = "FINDSCU";
         private static string CALLED_DEFAULT = "ANY-SCP";
+        private static string DB_PATIENTS = "PatientsSummary";
+        private static string DB_DICOMPATIENTS = "DicomPatientsData";
+        private static string DB_GPSFILES = "PatientsGPSFiles";
+        private static string DB_UPDATES = "updates1";
 
         private string QRServerHost = "localhost";
         private int QRServerPort = 4242;
@@ -82,10 +86,10 @@ namespace FindscuStudy {
 
         public static void Init() {
             KeyValDBClient.Setup("127.0.0.1", 55123);
-            dbClient4.Initialize("PatientsSummary");
-            dbClient.Initialize("DicomPatientsData");
-            dbClient2.Initialize("PatientsGPSFiles");
-            dbClient3.Initialize("updates1");
+            dbClient4.Initialize(DB_PATIENTS);
+            dbClient.Initialize(DB_DICOMPATIENTS);
+            dbClient2.Initialize(DB_GPSFILES);
+            dbClient3.Initialize(DB_UPDATES);
         }
         
         public static bool Put(DicomPatientData person) {
@@ -96,7 +100,7 @@ namespace FindscuStudy {
                 ok = dbClient.Update(key, outStream.ToArray());
             }
             if (ok) {
-                dbClient3.Update(key, Encoding.ASCII.GetBytes("DicomPatientsData"));
+                dbClient3.Update(key, Encoding.ASCII.GetBytes(DB_DICOMPATIENTS));
                 PatientGPSFileList gps = new PatientGPSFileList {
                     EntryTimestamp = DateTime.Now.Ticks
                 };
@@ -105,7 +109,7 @@ namespace FindscuStudy {
                     ok &= dbClient2.Update(key, outStream.ToArray());
                 }
                 if (ok) {
-                    dbClient3.Update(key, Encoding.ASCII.GetBytes("PatientsGPSFiles"));
+                    dbClient3.Update(key, Encoding.ASCII.GetBytes(DB_GPSFILES));
                 }
                 return ok;
             }
@@ -120,7 +124,7 @@ namespace FindscuStudy {
                 ok = dbClient4.Update(key, outStream.ToArray());
             }
             if (ok) {
-                dbClient3.Update(key, Encoding.ASCII.GetBytes("PatientsSummary"));
+                dbClient3.Update(key, Encoding.ASCII.GetBytes(DB_PATIENTS));
                 return ok;
             }
             return false;
