@@ -39,20 +39,28 @@ namespace FindscuStudy {
         private static KeyValDBClient dbClient2 = new KeyValDBClient();
         private static KeyValDBClient dbClient3 = new KeyValDBClient();
 
-        private string QRServerHost = "www.dicomserver.co.uk";
-        private int QRServerPort = 104;
-        private string QRServerAET = "STORESCP";
-        private string AET = "FODICOMSCU";
         private static int TIMEOUT = 60;
+        private static string CALLING_DEFAULT = "FINDSCU";
+        private static string CALLED_DEFAULT = "ANY-SCP";
+
+        private string QRServerHost = "localhost";
+        private int QRServerPort = 4242;
+        private string QRServerAET = CALLED_DEFAULT;
+        private string AET = CALLING_DEFAULT;
         private int timeout = TIMEOUT;
+
         private UnicodeToAscii u2a;
         private List<string> supportedAplhabets;
 
-        public FindscuStudyRunner(string server, int port, string calling=null, string called=null, int timeout=60) {
+        public FindscuStudyRunner(string server, int port, string calling="FINDSCU", string called="ANY-SCP", int timeout=60) {
             QRServerHost = server;
             QRServerPort = port;
-            AET = calling;
-            QRServerAET = called;
+            if (!String.IsNullOrWhiteSpace(calling)) {
+                AET = calling;
+            }
+            if (!String.IsNullOrWhiteSpace(called)) {
+                QRServerAET = called;
+            }
             this.timeout = timeout;
             u2a = new UnicodeToAscii("mappings.txtz");
             supportedAplhabets = new List<string>() {
@@ -291,12 +299,8 @@ namespace FindscuStudy {
         public void ParseResponse(string modality) {
             string prms =
                 QRServerHost + " " + QRServerPort;
-            if (!String.IsNullOrWhiteSpace(AET)) {
-                prms += (" --aetitle " + AET);
-            }
-            if (!String.IsNullOrWhiteSpace(QRServerAET)) {
-                prms += (" --call " + QRServerAET);
-            }
+            prms += (" --aetitle " + AET);
+            prms += (" --call " + QRServerAET);
             prms += $" -S -k QueryRetrieveLevel=STUDY -k ModalitiesInStudy={modality} -k PatientName -k PatientID -k StudyInstanceUID -k StudyDate -k PatientBirthDate -k PatientSex --extract-xml-single out.xml";
             if (timeout > 0) {
                 prms += (" -td " + timeout);
