@@ -7,8 +7,8 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{B10E37D5-AB07-4C63-9001-C32C91024E78}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <RootNamespace>DatabaseAdapter.Test</RootNamespace>
-    <AssemblyName>DatabaseAdapter.Test</AssemblyName>
+    <RootNamespace>YATIFindscuStudy</RootNamespace>
+    <AssemblyName>YATIFindscuStudy</AssemblyName>
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
