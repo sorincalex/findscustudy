@@ -300,7 +300,7 @@ namespace FindscuStudy {
             return dicomPatients;
         }
 
-        public void ParseResponse(string modality) {
+        public void ParseResponse(string findscu, string modality) {
             string prms =
                 QRServerHost + " " + QRServerPort;
             prms += (" --aetitle " + AET);
@@ -310,7 +310,7 @@ namespace FindscuStudy {
                 prms += (" -td " + timeout);
             }
             Logger.WriteMsg(LogSeverity.Info, $"Running findscu {prms}");
-            CreateXml("findscu.exe", prms);
+            CreateXml(findscu, prms);
 
             List<DicomPatientData> persons = ParseXml("out.xml", out List<Patient> patients);
             Logger.WriteMsg(LogSeverity.Info, $"findscu retrieved {persons.Count} patients");
@@ -358,8 +358,9 @@ namespace FindscuStudy {
             Logger.StartLogging(GetLogFilePath("Logs", "yati"), false);
             Logger.SetSeverityLevel(LogSeverity.Info);
 
-            if (args.Length < 5) {
+            if (args.Length < 6) {
                 Console.WriteLine("The following arguments need to be present:");
+                Console.WriteLine(" - the path to the findscu.exe program, e.g. c:\\dcmtk\\findscu.exe");
                 Console.WriteLine(" - the IP or hostname of the Dicom server");
                 Console.WriteLine(" - the port where the Dicom server is listening for connections");
                 Console.WriteLine(" - the modality we are interested in (e.g. IOL, OAM, KER, OP)");
@@ -368,23 +369,23 @@ namespace FindscuStudy {
                 Console.WriteLine(" - (optional) timeout of the findscu operation");
                 Environment.Exit(1);
             }
-
-            string dicomHost = args[0];
-            int dicomPort = Int16.Parse(args[1]);
-            string modality = args[2];
+            string findscuPath = args[0];
+            string dicomHost = args[1];
+            int dicomPort = Int16.Parse(args[2]);
+            string modality = args[3];
             string callingAE = null;
             string calledAE = null;
-            callingAE = args[3];
-            calledAE = args[4];
+            callingAE = args[4];
+            calledAE = args[5];
             int timeout = TIMEOUT;
-            if (args.Length > 5) {
-                timeout = Int16.Parse(args[5]);
+            if (args.Length > 6) {
+                timeout = Int16.Parse(args[6]);
             }
 
             Init();
 
             var findscu = new FindscuStudyRunner(dicomHost, dicomPort, callingAE, calledAE, timeout);
-            findscu.ParseResponse(modality);
+            findscu.ParseResponse(findscuPath, modality);
 
         }
 
