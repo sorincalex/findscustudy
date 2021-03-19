@@ -1,6 +1,7 @@
 ﻿
 using ProtoBuf;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -9,6 +10,7 @@ using System.Text;
 using System.Xml;
 using TRICS.General.Log;
 using TRICS.Planner.Model.Common.Dicom;
+using TRICS.Planner.Model.Common.Helper;
 using TRICS.Planner.Model.Common.Params;
 using TRICS.Planner.Model.PatientData;
 using TRICS.Wrapper.KeyValDB;
@@ -34,10 +36,11 @@ namespace FindscuStudy {
 
     class FindscuStudyRunner {
         
-        private static KeyValDBClient dbClient = new KeyValDBClient();
-        private static KeyValDBClient dbClient4 = new KeyValDBClient();
-        private static KeyValDBClient dbClient2 = new KeyValDBClient();
-        private static KeyValDBClient dbClient3 = new KeyValDBClient();
+        private static KeyValDBClient dbClientDicomPatients = new KeyValDBClient();
+        private static KeyValDBClient dbClientPatients = new KeyValDBClient();
+        private static KeyValDBClient dbClientGpsFiles = new KeyValDBClient();
+        private static KeyValDBClient dbClientUpdates1 = new KeyValDBClient();
+        private static KeyValDBClient dbClientDeviceAETitles = new KeyValDBClient();
 
         private static int TIMEOUT = 60;
         private static string CALLING_DEFAULT = "FINDSCU";
@@ -46,11 +49,12 @@ namespace FindscuStudy {
         private static string DB_DICOMPATIENTS = "DicomPatientsData";
         private static string DB_GPSFILES = "PatientsGPSFiles";
         private static string DB_UPDATES = "updates1";
+        private static string DB_DEVICEAETITLES = "DeviceAETitles";
 
         private string QRServerHost = "localhost";
         private int QRServerPort = 4242;
         private string QRServerAET = CALLED_DEFAULT;
-        private string AET = CALLING_DEFAULT;
+        private string AET = "";
         private int timeout = TIMEOUT;
 
         private UnicodeToAscii u2a;
@@ -86,31 +90,38 @@ namespace FindscuStudy {
 
         public static void Init() {
             KeyValDBClient.Setup("127.0.0.1", 55123);
-            dbClient4.Initialize(DB_PATIENTS);
-            dbClient.Initialize(DB_DICOMPATIENTS);
-            dbClient2.Initialize(DB_GPSFILES);
-            dbClient3.Initialize(DB_UPDATES);
+            dbClientDicomPatients.Initialize(DB_DICOMPATIENTS);
+            dbClientDeviceAETitles.Initialize(DB_DEVICEAETITLES, true);
+            dbClientGpsFiles.Initialize(DB_GPSFILES);
+            dbClientUpdates1.Initialize(DB_UPDATES);
+            dbClientPatients.Initialize(DB_PATIENTS);
+            
         }
-        
+
         public static bool Put(DicomPatientData person) {
             string key = person.PatientKey;
             bool ok = true;
             using (var outStream = new MemoryStream()) {
                 Serializer.Serialize<DicomPatientData>(outStream, person);
-                ok = dbClient.Update(key, outStream.ToArray());
+                ok = dbClientDicomPatients.Update(key, outStream.ToArray());
             }
             if (ok) {
-                dbClient3.Update(key, Encoding.ASCII.GetBytes(DB_DICOMPATIENTS));
-                PatientGPSFileList gps = new PatientGPSFileList {
-                    EntryTimestamp = DateTime.Now.Ticks
-                };
-                using (var outStream = new MemoryStream()) {
-                    Serializer.Serialize<PatientGPSFileList>(outStream, gps);
-                    ok &= dbClient2.Update(key, outStream.ToArray());
+                dbClientUpdates1.InsertAutoIncrement(DB_DICOMPATIENTS, StringToolkit.GetBytes(key));
+                byte[] byteGps = dbClientGpsFiles.Get(key);
+                if ((byteGps == null) || (byteGps.Length == 0)) {
+                    // it doesn't exist, insert it
+                    PatientGPSFileList gps = new PatientGPSFileList {
+                        EntryTimestamp = DateTime.Now.Ticks
+                    };
+                    using (var outStream = new MemoryStream()) {
+                        Serializer.Serialize<PatientGPSFileList>(outStream, gps);
+                        ok &= dbClientGpsFiles.Create(key, outStream.ToArray());
+                    }
+                    if (ok) {
+                        dbClientUpdates1.InsertAutoIncrement(DB_GPSFILES, StringToolkit.GetBytes(key));
+                    }
                 }
-                if (ok) {
-                    dbClient3.Update(key, Encoding.ASCII.GetBytes(DB_GPSFILES));
-                }
+                
                 return ok;
             }
             return false;
@@ -119,25 +130,39 @@ namespace FindscuStudy {
         public static bool Put(Patient person) {
             string key = person.GetFallbackKey().ToUpper();
             bool ok = true;
-            using (var outStream = new MemoryStream()) {
-                Serializer.Serialize<Patient>(outStream, person);
-                ok = dbClient4.Update(key, outStream.ToArray());
-            }
-            if (ok) {
-                dbClient3.Update(key, Encoding.ASCII.GetBytes(DB_PATIENTS));
-                return ok;
+            
+            byte[] bytePatient = dbClientPatients.Get(key);
+            if ((bytePatient == null) || (bytePatient.Length == 0)) {
+                // it doesn't exist, insert it
+                using (var outStream = new MemoryStream()) {
+                    Serializer.Serialize<Patient>(outStream, person);
+                    ok = dbClientPatients.Create(key, outStream.ToArray());
+                }
+                if (ok) {
+                    dbClientUpdates1.InsertAutoIncrement(DB_PATIENTS, StringToolkit.GetBytes(key));
+                    return ok;
+                }
             }
             return false;
         }
 
-        public static DicomPatientData Get(string key) {
-            byte[] toGet = dbClient.Get(key);
+        public static DicomDeviceAETitle GetAETitle(string key) {
+            byte[] toGet = dbClientDeviceAETitles.Get(key);
             using (var inStream = new MemoryStream(toGet)) {
-                return Serializer.Deserialize<DicomPatientData>(inStream);
+                return Serializer.Deserialize<DicomDeviceAETitle>(inStream);
+            }
+        }
+
+        public static object Get(string key, bool isPatient) {
+            byte[] toGet = (isPatient) ? dbClientPatients.Get(key) : dbClientDicomPatients.Get(key);
+            using (var inStream = new MemoryStream(toGet)) {
+                return (isPatient) ? 
+                    (object)Serializer.Deserialize<Patient>(inStream) : 
+                    (object)Serializer.Deserialize<DicomPatientData>(inStream);
             }            
         }
 
-        public static XmlDocument CreateXml(string com, string fileToConvert) {
+        public static bool CallFindscuOrError(string com, string fileToConvert) {
             // Start the child process.
             Process p = new Process();
             // Redirect the output stream of the child process.
@@ -150,10 +175,14 @@ namespace FindscuStudy {
             // reading to the end of its redirected stream.
             // p.WaitForExit();
             // Read the output stream first and then wait.
-            p.StandardOutput.ReadToEnd();
+            string errorData = p.StandardOutput.ReadToEnd();
             p.WaitForExit();
 
-            return null;
+            if (!String.IsNullOrWhiteSpace(errorData)) {
+                Logger.WriteMsg(LogSeverity.Warning, "Failure calling findscu " + errorData);
+                return false;
+            }
+            return true;
         }
 
         private List<DicomPatientData> ParseXml(string xmlfile, out List<Patient> patients) {
@@ -300,7 +329,7 @@ namespace FindscuStudy {
             return dicomPatients;
         }
 
-        public void ParseResponse(string findscu, string modality) {
+        private bool RunFindscu(string findscu, string modality) {
             string prms =
                 QRServerHost + " " + QRServerPort;
             prms += (" --aetitle " + AET);
@@ -310,7 +339,40 @@ namespace FindscuStudy {
                 prms += (" -td " + timeout);
             }
             Logger.WriteMsg(LogSeverity.Info, $"Running findscu {prms}");
-            CreateXml(findscu, prms);
+            return CallFindscuOrError(findscu, prms);
+        }
+
+        public void ParseResponse(string findscu, string modality) {
+
+            bool runFindscu = false;
+            if (String.IsNullOrWhiteSpace(AET)) {
+                // before trying the default FINDSCU, find out if there are AE titles in the DB
+                IEnumerator<KeyVal> aetitles = dbClientDeviceAETitles.GetEnumerator();
+                while(aetitles.MoveNext()) {
+                    DicomDeviceAETitle aetitle = GetAETitle(Encoding.ASCII.GetString(aetitles.Current.Key));
+                    if (aetitle != null && !String.IsNullOrWhiteSpace(aetitle.DeviceAETitle)) {
+                        AET = aetitle.DeviceAETitle;
+                        runFindscu |= RunFindscu(findscu, modality);
+                        if (runFindscu) break;
+                    }
+                }
+            } else {
+                // call it with the given AE title
+                runFindscu |= RunFindscu(findscu, modality);
+            }
+
+            if (!runFindscu) {
+                // no AE titles in DB or the call to findscu simply failed
+                // try the default AE title
+                AET = CALLING_DEFAULT;
+                runFindscu = RunFindscu(findscu, modality);
+            }
+
+            if (!runFindscu) {
+                // if there is still an error with the default AE title
+                Logger.WriteMsg(LogSeverity.Error, "Failed calling findscu with default AE title.");
+                return;
+            }
 
             List<DicomPatientData> persons = ParseXml("out.xml", out List<Patient> patients);
             Logger.WriteMsg(LogSeverity.Info, $"findscu retrieved {persons.Count} patients");
@@ -321,9 +383,13 @@ namespace FindscuStudy {
                 Put(p);
                 Put(patients[i]);
             }
-            /*
+            
+            /* Read back
             foreach (DicomPatientData p in persons) {
-                DicomPatientData person = Get(p.PatientKey);
+                DicomPatientData person = (DicomPatientData)Get(p.PatientKey, false);
+            }
+            foreach (Patient p in patients) {
+                Patient patient = (Patient)Get(p.GetFallbackKey().ToUpper(), true);
             }
             */
         }
@@ -383,6 +449,23 @@ namespace FindscuStudy {
             }
 
             Init();
+
+            /* Just for the test
+            DicomDeviceAETitle device = new DicomDeviceAETitle();
+            device.Timestamp = DateTime.Now.ToString();
+            device.DeviceAETitle = "AETitle100";
+            using (var outStream = new MemoryStream()) {
+                Serializer.Serialize<DicomDeviceAETitle>(outStream, device);
+                dbClientDeviceAETitles.Create(device.Timestamp, outStream.ToArray());
+            }
+
+            device.Timestamp = DateTime.Now.ToString();
+            device.DeviceAETitle = "AETitle200";
+            using (var outStream = new MemoryStream()) {
+                Serializer.Serialize<DicomDeviceAETitle>(outStream, device);
+                dbClientDeviceAETitles.Create(device.Timestamp, outStream.ToArray());
+            }
+            */
 
             var findscu = new FindscuStudyRunner(dicomHost, dicomPort, callingAE, calledAE, timeout);
             findscu.ParseResponse(findscuPath, modality);
